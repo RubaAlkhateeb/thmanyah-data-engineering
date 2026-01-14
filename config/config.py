@@ -31,7 +31,6 @@ POLL_TIMEOUT_MS = 1000           # poll every 1s
 IDLE_FLUSH_SECONDS = 10          # flush when no messages for 10s
 
 EXTERNAL_API_URL = os.getenv('EXTERNAL_API_URL', 'https://webhook-test.com/0e4aa16f9464261e01b71819010890f0')
-EXTERNAL_API_TOKEN = os.getenv('EXTERNAL_API_TOKEN', '')
 REQUEST_TIMEOUT_SECONDS = 30
 MAX_RETRIES = 3
 
