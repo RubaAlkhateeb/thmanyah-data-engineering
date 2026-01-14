@@ -1,0 +1,20 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+sqlalchemy = "*"
+psycopg2-binary = "*"
+python-dotenv = "*"
+pandas = "*"
+kafka-python = "*"
+redis = "*"
+requests = "*"
+google-cloud-bigquery = "*"
+google-api-core = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.9"
