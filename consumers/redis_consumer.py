@@ -197,6 +197,7 @@ def consume_and_store():
             
             # Process event (aggregates into time window + tracks latency)
             process_event(redis_client, event)
+            logger.debug(f"Processed event: {event.get('event_id')}")
             
             event_count += 1
             

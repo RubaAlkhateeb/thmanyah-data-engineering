@@ -25,8 +25,12 @@ LATENCY_WARN_TTL_SECONDS = 3600
 BIGQUERY_PROJECT = os.getenv('BIGQUERY_PROJECT', 'thmanyah-de')
 BIGQUERY_DATASET = os.getenv('BIGQUERY_DATASET', 'engagement')
 BIGQUERY_TABLE = os.getenv('BIGQUERY_TABLE', 'engagement_events')
+MAX_BATCH_SIZE = 500
+MIN_BATCH_SIZE = 50              # only flush early if at least this many
+POLL_TIMEOUT_MS = 1000           # poll every 1s
+IDLE_FLUSH_SECONDS = 10          # flush when no messages for 10s
 
-EXTERNAL_API_URL = os.getenv('EXTERNAL_API_URL', 'https://webhook.site/dd398fa5-b75e-4ead-a795-093c0a5dc620')
+EXTERNAL_API_URL = os.getenv('EXTERNAL_API_URL', 'https://webhook-test.com/0e4aa16f9464261e01b71819010890f0')
 EXTERNAL_API_TOKEN = os.getenv('EXTERNAL_API_TOKEN', '')
 REQUEST_TIMEOUT_SECONDS = 30
 MAX_RETRIES = 3

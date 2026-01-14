@@ -6,7 +6,15 @@ from google.api_core import retry
 from datetime import datetime
 from utilities.kafka_utils import create_consumer
 from config.logger_config import get_logger
-from config.config import BIGQUERY_PROJECT, BIGQUERY_DATASET, BIGQUERY_TABLE
+from config.config import (
+    BIGQUERY_PROJECT,
+    BIGQUERY_DATASET,
+    BIGQUERY_TABLE,
+    MAX_BATCH_SIZE,
+    MIN_BATCH_SIZE,
+    POLL_TIMEOUT_MS,
+    IDLE_FLUSH_SECONDS
+)
 
 logger = get_logger(__name__)
 
@@ -117,55 +125,80 @@ def insert_data(client, rows):
         return 0
 
 
+from datetime import datetime
+
 def consume_and_write_to_bigquery():
-    """
-    Main consumer loop
-    Processes each event immediately
-    """
-    
     logger.info("Starting BigQuery Consumer...")
-    
-    # Connect to BigQuery
-    try:
-        bq_client = create_bigquery_client()
-    except Exception as e:
-        logger.error("Cannot start BigQuery consumer without connection")
-        return
-    
-    # Create Kafka consumer
+
+    bq_client = create_bigquery_client()
+
     consumer = create_consumer(
         topic="engagement_events_transformed",
         group_id="bigquery_consumer_group"
     )
-    
+
     logger.info("Consuming from: engagement_events_transformed")
-    logger.info(f"BigQuery target: {BIGQUERY_PROJECT}.{BIGQUERY_DATASET}.{BIGQUERY_TABLE}")
-    logger.info("Press Ctrl+C to stop")
-    
+
+    batch = []
     event_count = 0
     inserted_count = 0
-    
+
+    last_message_time = datetime.now()
+
     try:
-        for message in consumer:
-            event = message.value
-            
-            # Prepare row for BigQuery
-            row = prepare_row(event)
-            
-            inserted = insert_data(bq_client, [row])
-            logger.info("Inserted event_id %s to BigQuery", row['event_id'])
-            
-            event_count += 1
-            if inserted > 0:
+        while True:
+            records = consumer.poll(timeout_ms=POLL_TIMEOUT_MS)
+
+            now = datetime.now()
+            idle_seconds = (now - last_message_time).total_seconds()
+
+            # If we got messages, append them to the batch
+            if records:
+                last_message_time = now
+
+                for _, messages in records.items():
+                    for msg in messages:
+                        row = prepare_row(msg.value)
+                        batch.append(row)
+                        event_count += 1
+
+            # Flush conditions
+            should_flush_big = len(batch) >= MAX_BATCH_SIZE
+            should_flush_idle = idle_seconds >= IDLE_FLUSH_SECONDS and len(batch) > 0
+            should_flush_min = should_flush_idle and len(batch) >= MIN_BATCH_SIZE
+
+            # If idle and batch is small, you can decide: flush anyway or keep waiting.
+            # Option A (recommended): flush even if small after being idle
+            should_flush = should_flush_big or should_flush_idle
+
+            # Option B: ONLY flush on idle if batch >= MIN_BATCH_SIZE
+            # should_flush = should_flush_big or should_flush_min
+
+            if should_flush:
+                logger.info(
+                    f"Flushing {len(batch)} rows "
+                    f"(idle={idle_seconds:.1f}s, size={len(batch)})"
+                )
+
+                inserted = insert_data(bq_client, batch)
+
+                if inserted == 0:
+                    logger.error("Flush finished but inserted=0 (check insert_data logs/errors).")
+
                 inserted_count += inserted
-            
-            # Log progress
-            if event_count % 100 == 0:
-                logger.info(f"Processed {event_count} events, Inserted {inserted_count} to BigQuery")
-    
+                batch.clear()
+
+            if event_count > 0 and event_count % 100 == 0:
+                logger.info(f"Processed {event_count} events | Inserted {inserted_count} rows")
+
     except KeyboardInterrupt:
         logger.info("BigQuery consumer stopped by user")
-    
+
     finally:
+        if batch:
+            logger.info(f"Final flush of {len(batch)} rows")
+            inserted = insert_data(bq_client, batch)
+            inserted_count += inserted
+
         consumer.close()
-        logger.info(f"BigQuery consumer closed. Total: {event_count} processed, {inserted_count} inserted")
+        logger.info(f"Consumer closed. Total processed={event_count}, inserted={inserted_count}")
