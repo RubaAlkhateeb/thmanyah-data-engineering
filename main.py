@@ -57,8 +57,8 @@ def main():
     
     # Configure tables to seed (automatic type conversion!)
     tables_config = [
-        {'model': Content, 'csv_path': 'config/seed/content.csv'},
-        {'model': EngagementEvent, 'csv_path': 'config/seed/engagement_events.csv'}
+        {'model': Content, 'csv_path': 'seed/content.csv'},
+        {'model': EngagementEvent, 'csv_path': 'seed/engagement_events.csv'}
     ]
     
     seed_from_csv_if_empty(engine, tables_config)
